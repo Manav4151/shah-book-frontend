@@ -2,40 +2,32 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFunctions, ApiError } from '@/services/api.service';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
-import { Button } from '@/app/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
+import { apiFunctions } from '@/services/api.service';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Minus, ArrowLeft, Trash2 } from 'lucide-react';
-import { BookSelectionDialog } from '@/app/components/BookSelectionDialog';
+import { 
+    Plus, Minus, ArrowLeft, Trash2, Save, 
+    Calendar, User, FileText, Percent 
+} from 'lucide-react';
+import { BookSelectionDialog } from '@/components/books/BookSelectionDialog';
 
-// Type definitions
-type Quantities = {
-    [bookId: string]: number;
-};
-
-type BookDiscounts = {
-    [bookId: string]: number;
-};
-
-type CustomPrices = {
-    [bookId: string]: number;
-};
+// --- Type definitions ---
+type Quantities = { [bookId: string]: number };
+type BookDiscounts = { [bookId: string]: number };
+type CustomPrices = { [bookId: string]: number };
 
 type Book = {
     _id: string;
     title: string;
     isbn: string;
     author?: string;
-    publisher?: Publisher; 
+    publisher?: Publisher;
     edition?: string;
 };
-type Publisher = {
-    _id: string;
-    name: string;
-}
+type Publisher = { _id: string; name: string };
 type QuotationItem = {
     _id: string;
     book: Book | string;
@@ -45,16 +37,19 @@ type QuotationItem = {
     totalPrice: number;
 };
 
+// Customer Type
 type Customer = {
     _id: string;
-    name?: string;
-    customerName?: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: any;
 };
 
 type Quotation = {
     _id: string;
     quotationId: string;
-    customer: Customer;
+    customer: Customer; // We assume this is always populated based on your API response
     items: QuotationItem[];
     subTotal: number;
     totalDiscount: number;
@@ -73,8 +68,6 @@ type QuotationPreviewBook = {
     lowestPrice: number;
     currency: string;
 };
-
-type InputChangeEvent = React.ChangeEvent<HTMLInputElement>;
 
 type QuotationPayloadItem = {
     book: string;
@@ -101,24 +94,31 @@ export default function EditQuotationPage() {
 
     const [quotation, setQuotation] = useState<Quotation | null>(null);
     const [books, setBooks] = useState<QuotationPreviewBook[]>([]);
+    
+    // Form State
     const [quantities, setQuantities] = useState<Quantities>({});
-    const [customerId, setCustomerId] = useState("");
-    const [status, setStatus] = useState<'Draft' | 'Sent' | 'Accepted' | 'Rejected'>('Draft');
-    const [validUntil, setValidUntil] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
     const [bookDiscounts, setBookDiscounts] = useState<BookDiscounts>({});
     const [generalDiscount, setGeneralDiscount] = useState<string>("");
     const [customPrices, setCustomPrices] = useState<CustomPrices>({});
+    const [status, setStatus] = useState<'Draft' | 'Sent' | 'Accepted' | 'Rejected'>('Draft');
+    const [validUntil, setValidUntil] = useState("");
+    
+    // We only need customerId for the Save Payload. 
+    // The Display name comes directly from the quotation object now.
+    const [customerId, setCustomerId] = useState("");
+
+    const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [bookDialogOpen, setBookDialogOpen] = useState(false);
 
-    // Load quotation data
+    // Initial Data Loading
     useEffect(() => {
-        const fetchQuotation = async () => {
+        const loadData = async () => {
             try {
                 setLoading(true);
+                
+                // Fetch ONLY the quotation. We don't need the customer list.
                 const response = await apiFunctions.getQuotationById(quotationId);
 
                 if (!response.success || !response.quotation) {
@@ -128,17 +128,18 @@ export default function EditQuotationPage() {
                 const quotationData = response.quotation as Quotation;
                 setQuotation(quotationData);
 
-                // Set customer ID
-                setCustomerId(quotationData.customer._id);
+                // Extract Customer ID for the update payload
+                // The API response ensures quotationData.customer is an object
+                if (quotationData.customer && typeof quotationData.customer === 'object') {
+                    setCustomerId(quotationData.customer._id);
+                }
 
-                // Set status
-                setStatus(quotationData.status as 'Draft' | 'Sent' | 'Accepted' | 'Rejected');
-
-                // Set valid until date
+                // Set Metadata
+                setStatus(quotationData.status as any);
                 const validUntilDate = new Date(quotationData.validUntil);
                 setValidUntil(validUntilDate.toISOString().split('T')[0]);
 
-                // Convert quotation items to preview books format
+                // Set Items/Books
                 const previewBooks: QuotationPreviewBook[] = quotationData.items.map((item) => {
                     const book = typeof item.book === "object" ? item.book : null;
                     return {
@@ -153,7 +154,7 @@ export default function EditQuotationPage() {
 
                 setBooks(previewBooks);
 
-                // Initialize quantities, prices, and discounts from quotation items
+                // Initialize tracking maps
                 const initialQuantities: Quantities = {};
                 const initialCustomPrices: CustomPrices = {};
                 const initialBookDiscounts: BookDiscounts = {};
@@ -169,70 +170,53 @@ export default function EditQuotationPage() {
                 setCustomPrices(initialCustomPrices);
                 setBookDiscounts(initialBookDiscounts);
 
-                // Calculate general discount percentage
-                // This is an approximation since we don't store it separately
-                const calculatedGeneralDiscount = quotationData.totalDiscount > 0 
+                // Calculate General Discount
+                const calculatedGeneralDiscount = quotationData.totalDiscount > 0
                     ? ((quotationData.totalDiscount / quotationData.subTotal) * 100).toFixed(2)
-                    : "0";
-                setGeneralDiscount(calculatedGeneralDiscount);
+                    : ""; 
+                setGeneralDiscount(calculatedGeneralDiscount === "0.00" ? "" : calculatedGeneralDiscount);
 
             } catch (err) {
-                console.error("Error fetching quotation:", err);
-                setError(err instanceof ApiError ? err.message : "Failed to load quotation");
-                toast.error("Failed to load quotation");
+                console.error("Error loading data:", err);
+                setError(err instanceof Error ? err.message : "Failed to load data");
+                toast.error("Failed to load quotation data");
             } finally {
                 setLoading(false);
             }
         };
 
         if (quotationId) {
-            fetchQuotation();
+            loadData();
         }
     }, [quotationId]);
 
-    // Handlers
+    // --- Handlers ---
     const handleQuantityChange = (bookId: string, value: string) => {
         const quantity = parseInt(value, 10);
-        setQuantities(prev => ({
-            ...prev,
-            [bookId]: isNaN(quantity) || quantity < 1 ? 1 : quantity
-        }));
+        setQuantities(prev => ({ ...prev, [bookId]: isNaN(quantity) || quantity < 1 ? 1 : quantity }));
     };
 
     const handleQuantityIncrement = (bookId: string) => {
-        setQuantities(prev => ({
-            ...prev,
-            [bookId]: (prev[bookId] || 1) + 1
-        }));
+        setQuantities(prev => ({ ...prev, [bookId]: (prev[bookId] || 1) + 1 }));
     };
 
     const handleQuantityDecrement = (bookId: string) => {
         setQuantities(prev => {
             const current = prev[bookId] || 1;
-            return {
-                ...prev,
-                [bookId]: current > 1 ? current - 1 : 1
-            };
+            return { ...prev, [bookId]: current > 1 ? current - 1 : 1 };
         });
     };
 
     const handleCustomPriceChange = (bookId: string, value: string) => {
         const price = parseFloat(value);
-        setCustomPrices(prev => ({
-            ...prev,
-            [bookId]: isNaN(price) || price < 0 ? 0 : price
-        }));
+        setCustomPrices(prev => ({ ...prev, [bookId]: isNaN(price) || price < 0 ? 0 : price }));
     };
 
     const handleBookDiscountChange = (bookId: string, value: string) => {
         const discount = parseFloat(value);
-        setBookDiscounts(prev => ({
-            ...prev,
-            [bookId]: isNaN(discount) || discount < 0 ? 0 : discount
-        }));
+        setBookDiscounts(prev => ({ ...prev, [bookId]: isNaN(discount) || discount < 0 ? 0 : discount }));
     };
 
-    // Calculate quotation summary
     const quotationSummary = useMemo(() => {
         const subtotal = books.reduce((acc, book) => {
             const price = customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : (book.lowestPrice || 0);
@@ -258,13 +242,11 @@ export default function EditQuotationPage() {
         };
     }, [books, quantities, bookDiscounts, generalDiscount, customPrices]);
 
-    // Build payload
     const buildQuotationPayload = (): QuotationPayload => {
         const calculatedItems: QuotationPayloadItem[] = books.map(book => {
             const unitPrice = customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : (book.lowestPrice || 0);
             const quantity = quantities[book.bookId] || 1;
             const discountPercent = bookDiscounts[book.bookId] || 0;
-
             const lineItemGrossTotal = unitPrice * quantity;
             const lineItemDiscountAmount = lineItemGrossTotal * (discountPercent / 100);
             const lineItemFinalTotal = lineItemGrossTotal - lineItemDiscountAmount;
@@ -278,77 +260,40 @@ export default function EditQuotationPage() {
             };
         });
 
-        const {
-            subtotal,
-            total,
-            generalDiscountPercent,
-        } = quotationSummary;
-
         const totalItemDiscountAmount = books.reduce((acc, book) => {
             const unitPrice = customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : (book.lowestPrice || 0);
             const quantity = quantities[book.bookId] || 1;
             const discountPercent = bookDiscounts[book.bookId] || 0;
-            const lineItemGrossTotal = unitPrice * quantity;
-            return acc + (lineItemGrossTotal * discountPercent / 100);
+            return acc + ((unitPrice * quantity) * discountPercent / 100);
         }, 0);
 
-        const subTotalAfterItemDiscounts = subtotal - totalItemDiscountAmount;
-        const generalDiscountAmount = subTotalAfterItemDiscounts * (generalDiscountPercent / 100);
+        const generalDiscountAmount = quotationSummary.discountAmount;
         const totalDiscountAmount = totalItemDiscountAmount + generalDiscountAmount;
-
-        // Use provided validUntil or default to 30 days from now
-        const validUntilDate = validUntil 
-            ? new Date(validUntil)
-            : (() => {
-                const date = new Date();
-                date.setDate(date.getDate() + 30);
-                return date;
-            })();
 
         return {
             customer: customerId,
             items: calculatedItems,
-            subTotal: subtotal,
+            subTotal: quotationSummary.subtotal,
             totalDiscount: totalDiscountAmount,
-            grandTotal: total,
+            grandTotal: quotationSummary.total,
             status: status,
-            validUntil: validUntilDate.toISOString()
+            validUntil: validUntil ? new Date(validUntil).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         };
     };
 
-    // Handle books selected from dialog
     const handleBooksSelected = async (selectedBookIds: string[]) => {
         try {
-            // Get current book IDs
             const currentBookIds = books.map(b => b.bookId);
-            
-            // Find newly added books (not in current list)
             const newBookIds = selectedBookIds.filter(id => !currentBookIds.includes(id));
-            
-            // Find removed books (in current list but not in selected)
             const removedBookIds = currentBookIds.filter(id => !selectedBookIds.includes(id));
-            
-            // Remove books that were deselected
+
             if (removedBookIds.length > 0) {
                 setBooks(prev => prev.filter(book => !removedBookIds.includes(book.bookId)));
-                setQuantities(prev => {
-                    const updated = { ...prev };
-                    removedBookIds.forEach(id => delete updated[id]);
-                    return updated;
-                });
-                setCustomPrices(prev => {
-                    const updated = { ...prev };
-                    removedBookIds.forEach(id => delete updated[id]);
-                    return updated;
-                });
-                setBookDiscounts(prev => {
-                    const updated = { ...prev };
-                    removedBookIds.forEach(id => delete updated[id]);
-                    return updated;
-                });
+                setQuantities(prev => { const u = { ...prev }; removedBookIds.forEach(id => delete u[id]); return u; });
+                setCustomPrices(prev => { const u = { ...prev }; removedBookIds.forEach(id => delete u[id]); return u; });
+                setBookDiscounts(prev => { const u = { ...prev }; removedBookIds.forEach(id => delete u[id]); return u; });
             }
-            
-            // Fetch preview data for newly added books
+
             if (newBookIds.length > 0) {
                 const previewResponse = await apiFunctions.getQuotationPreview(newBookIds);
                 if (previewResponse.success && previewResponse.data) {
@@ -360,11 +305,7 @@ export default function EditQuotationPage() {
                         lowestPrice: book.lowestPrice || 0,
                         currency: book.currency || "USD",
                     }));
-                    
-                    // Add new books to the list
                     setBooks(prev => [...prev, ...newBooks]);
-                    
-                    // Initialize quantities, prices, and discounts for new books
                     newBooks.forEach(book => {
                         setQuantities(prev => ({ ...prev, [book.bookId]: 1 }));
                         setCustomPrices(prev => ({ ...prev, [book.bookId]: book.lowestPrice }));
@@ -372,65 +313,34 @@ export default function EditQuotationPage() {
                     });
                 }
             }
-            
-            toast.success("Books updated successfully");
+            toast.success("Books list updated");
         } catch (err) {
-            console.error("Error updating books:", err);
+            console.error(err);
             toast.error("Failed to update books");
         }
     };
 
-    // Handle remove book
     const handleRemoveBook = (bookId: string) => {
         setBooks(prev => prev.filter(book => book.bookId !== bookId));
-        setQuantities(prev => {
-            const updated = { ...prev };
-            delete updated[bookId];
-            return updated;
-        });
-        setCustomPrices(prev => {
-            const updated = { ...prev };
-            delete updated[bookId];
-            return updated;
-        });
-        setBookDiscounts(prev => {
-            const updated = { ...prev };
-            delete updated[bookId];
-            return updated;
-        });
-        toast.success("Book removed");
+        setQuantities(prev => { const u = { ...prev }; delete u[bookId]; return u; });
+        setCustomPrices(prev => { const u = { ...prev }; delete u[bookId]; return u; });
+        setBookDiscounts(prev => { const u = { ...prev }; delete u[bookId]; return u; });
     };
 
-    // Get current book IDs for the dialog
-    const currentBookIds = books.map(b => b.bookId);
-
-    // Handle save
     const handleSave = async () => {
-        if (!customerId) {
-            toast.error("Please enter a customer ID");
-            return;
-        }
-
-        if (books.length === 0) {
-            toast.error("At least one item is required");
-            return;
-        }
+        if (!customerId) return toast.error("Error: Customer ID missing");
+        if (books.length === 0) return toast.error("At least one item is required");
 
         try {
             setIsSaving(true);
             const payload = buildQuotationPayload();
-
             const response = await apiFunctions.updateQuotation(quotationId, payload);
-
-            if (!response.success) {
-                throw new Error(response.message);
-            }
-
-            toast.success(response.message || "Quotation updated successfully!");
+            if (!response.success) throw new Error(response.message);
+            toast.success("Quotation updated successfully!");
             router.push(`/quotation/${quotationId}`);
         } catch (err) {
             console.error("Update error:", err);
-            toast.error(err instanceof Error ? err.message : "Failed to update quotation");
+            toast.error(err instanceof Error ? err.message : "Failed to update");
         } finally {
             setIsSaving(false);
         }
@@ -438,9 +348,10 @@ export default function EditQuotationPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
-                <div className="text-center">
-                    <p className="text-[var(--text-secondary)]">Loading quotation...</p>
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4 animate-pulse">
+                    <div className="h-8 w-8 bg-muted rounded-full"></div>
+                    <p className="text-muted-foreground">Loading quotation details...</p>
                 </div>
             </div>
         );
@@ -448,270 +359,289 @@ export default function EditQuotationPage() {
 
     if (error || !quotation) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
-                <div className="bg-[var(--surface)] shadow-lg rounded-2xl p-8 max-w-md border border-[var(--border)]">
-                    <div className="text-center">
-                        <p className="text-[var(--error)] mb-4">Error: {error || "Quotation not found"}</p>
-                        <div className="flex gap-3 justify-center">
-                            <Button onClick={() => router.push("/quotation")} variant="outline">
-                                Back to List
-                            </Button>
-                        </div>
-                    </div>
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                <div className="bg-card shadow-lg rounded-xl p-8 max-w-md border border-border text-center">
+                    <p className="text-destructive mb-4">Error: {error || "Quotation not found"}</p>
+                    <Button onClick={() => router.push("/quotation")} variant="outline">
+                        Return to List
+                    </Button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="max-w-7xl mx-auto p-8 bg-[var(--background)]">
-            <div className="mb-6">
-                <Button
-                    variant="ghost"
-                    onClick={() => router.push(`/quotation/${quotationId}`)}
-                    className="mb-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Quotation
-                </Button>
-                <h1 className="text-3xl font-bold mb-2 text-[var(--text-primary)]">Edit Quotation</h1>
-                <p className="text-[var(--text-secondary)]">Quotation ID: {quotation.quotationId}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-6">
-                    <Label htmlFor="customer-id" className="text-lg font-medium text-[var(--text-primary)]">Customer ID</Label>
-                    <Input
-                        id="customer-id"
-                        placeholder="Enter customer ID..."
-                        value={customerId}
-                        onChange={(e: InputChangeEvent) => setCustomerId(e.target.value)}
-                        className="mt-2 text-lg h-12"
-                    />
+        <div className="min-h-screen bg-background pb-20">
+            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+                
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <Button
+                            variant="ghost"
+                            onClick={() => router.back()}
+                            className="pl-0 hover:bg-transparent text-muted-foreground hover:text-foreground mb-2"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back to Details
+                        </Button>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit Quotation</h1>
+                        <p className="text-muted-foreground mt-1">
+                            Editing ID: <span className="font-mono text-foreground">{quotation.quotationId}</span>
+                        </p>
+                    </div>
+                    <div className="flex gap-3">
+                        <Button variant="outline" onClick={() => router.push(`/quotation/${quotationId}`)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={isSaving || books.length === 0} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                            {isSaving ? <span className="animate-pulse">Saving...</span> : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save Changes
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-6">
-                    <Label htmlFor="general-discount" className="text-lg font-medium text-[var(--text-primary)]">General Discount (%)</Label>
-                    <Input
-                        id="general-discount"
-                        type="number"
-                        placeholder="e.g., 5 (optional)"
-                        value={generalDiscount}
-                        onChange={(e: InputChangeEvent) => setGeneralDiscount(e.target.value)}
-                        className="mt-2 text-lg h-12"
-                        min="0"
-                    />
+                {/* Control Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    
+                    {/* Customer Display (Read Only - Directly from Quotation Object) */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                            <User className="w-4 h-4" /> Customer
+                        </Label>
+                        <div className="h-10 px-3 bg-muted/50 border border-border rounded-md flex items-center justify-between">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                    {quotation.customer?.name ? quotation.customer.name.charAt(0) : "?"}
+                                </div>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="font-medium text-sm leading-tight truncate text-foreground">
+                                        {quotation.customer?.name || "Unknown Customer"}
+                                    </span>
+                                </div>
+                            </div>
+                            {quotation.customer?.email && (
+                                <span className="text-xs text-muted-foreground hidden sm:block truncate ml-2">
+                                    {quotation.customer.email}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Status Select */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                            <FileText className="w-4 h-4" /> Status
+                        </Label>
+                        <Select value={status} onValueChange={(v: any) => setStatus(v)}>
+                            <SelectTrigger className="h-10 bg-card border-border">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Draft">Draft</SelectItem>
+                                <SelectItem value="Sent">Sent</SelectItem>
+                                <SelectItem value="Accepted">Accepted</SelectItem>
+                                <SelectItem value="Rejected">Rejected</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Date Picker */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="w-4 h-4" /> Valid Until
+                        </Label>
+                        <Input
+                            type="date"
+                            value={validUntil}
+                            onChange={(e) => setValidUntil(e.target.value)}
+                            className="h-10 bg-card border-border"
+                        />
+                    </div>
+
+                    {/* General Discount */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+                            <Percent className="w-4 h-4" /> General Discount (%)
+                        </Label>
+                        <Input
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            max="100"
+                            value={generalDiscount}
+                            onChange={(e) => setGeneralDiscount(e.target.value)}
+                            className="h-10 bg-card border-border"
+                        />
+                    </div>
                 </div>
 
-                <div className="bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-6">
-                    <Label htmlFor="status" className="text-lg font-medium text-[var(--text-primary)]">Status</Label>
-                    <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
-                        <SelectTrigger id="status" className="mt-2 text-lg h-12">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Draft">Draft</SelectItem>
-                            <SelectItem value="Sent">Sent</SelectItem>
-                            <SelectItem value="Accepted">Accepted</SelectItem>
-                            <SelectItem value="Rejected">Rejected</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-6">
-                    <Label htmlFor="valid-until" className="text-lg font-medium text-[var(--text-primary)]">Valid Until</Label>
-                    <Input
-                        id="valid-until"
-                        type="date"
-                        value={validUntil}
-                        onChange={(e: InputChangeEvent) => setValidUntil(e.target.value)}
-                        className="mt-2 text-lg h-12"
-                    />
-                </div>
-            </div>
-
-            {/* Books Table */}
-            <div className="bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden mb-6">
-                <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Books</h2>
-                    <Button
-                        onClick={() => setBookDialogOpen(true)}
-                        className="bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Books
-                    </Button>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-[var(--border)]" style={{ minWidth: '1000px', tableLayout: 'fixed' }}>
-                        <thead className="bg-[var(--surface-hover)]">
-                            <tr>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '25%' }}>Title & ISBN</th>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '10%' }}>Publisher</th>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '9%' }}>Original Price</th>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '10%' }}>Custom Price</th>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '8%' }}>Discount (%)</th>
-                                <th className="px-3 py-3 text-left text-[var(--text-secondary)]" style={{ width: '10%' }}>Quantity</th>
-                                <th className="px-3 py-3 text-right text-[var(--text-secondary)]" style={{ width: '15%' }}>Total</th>
-                                <th className="px-3 py-3 text-center text-[var(--text-secondary)]" style={{ width: '5%' }}>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
-                            {books.map((book) => {
-                                const customPrice = customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : book.lowestPrice;
-                                const quantity = quantities[book.bookId] || 1;
-                                const discountPercent = bookDiscounts[book.bookId] || 0;
-                                const discountedPrice = customPrice * (1 - discountPercent / 100);
-                                const lineTotal = discountedPrice * quantity;
-
-                                return (
-                                    <tr key={book.bookId} className="hover:bg-[var(--surface-hover)]">
-                                        <td className="px-3 py-4">
-                                            <div className="break-words whitespace-normal">
-                                                <div className="font-medium text-[var(--text-primary)]">{book.title}</div>
-                                                <div className="text-xs text-[var(--text-secondary)] mt-1">ISBN: {book.isbn}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-4 truncate text-[var(--text-primary)]">{book.publisher_name}</td>
-                                        <td className="px-3 py-4 text-[var(--text-secondary)]">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs">{book.currency}</span>
-                                                <span className="font-medium text-[var(--text-primary)]">${book.lowestPrice.toFixed(2)}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-4">
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={customPrices[book.bookId] !== undefined ? customPrices[book.bookId].toFixed(2) : book.lowestPrice.toFixed(2)}
-                                                onChange={(e: InputChangeEvent) => handleCustomPriceChange(book.bookId, e.target.value)}
-                                                className="w-full min-w-[90px] max-w-[110px]"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-4">
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={bookDiscounts[book.bookId] || ''}
-                                                onChange={(e: InputChangeEvent) => handleBookDiscountChange(book.bookId, e.target.value)}
-                                                className="w-full min-w-[70px] max-w-[90px]"
-                                                placeholder="0"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-4">
-                                            <div className="flex items-center gap-2 justify-start">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleQuantityDecrement(book.bookId)}
-                                                    className="h-8 w-8 p-0 flex-shrink-0"
-                                                    disabled={quantity <= 1}
-                                                >
-                                                    <Minus className="h-4 w-4" />
-                                                </Button>
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    value={quantity}
-                                                    onChange={(e: InputChangeEvent) => handleQuantityChange(book.bookId, e.target.value)}
-                                                    className="w-16 text-center"
-                                                    style={{ minWidth: '64px', maxWidth: '64px' }}
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleQuantityIncrement(book.bookId)}
-                                                    className="h-8 w-8 p-0 flex-shrink-0"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-4 text-right font-medium whitespace-nowrap">
-                                            ${lineTotal.toFixed(2)}
-                                        </td>
-                                        <td className="px-3 py-4 text-center">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleRemoveBook(book.bookId)}
-                                                className="text-[var(--error)] hover:text-[var(--error)] hover:bg-[var(--error)]/10"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                {/* Books Table Card */}
+                <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-border flex flex-row items-center justify-between bg-muted/30">
+                        <div>
+                            <h3 className="font-semibold text-lg text-foreground">Line Items</h3>
+                            <p className="text-sm text-muted-foreground">Manage books and pricing</p>
+                        </div>
+                        <Button 
+                            onClick={() => setBookDialogOpen(true)}
+                            variant="outline"
+                            className="bg-background hover:bg-accent"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Add Books
+                        </Button>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
+                                <tr>
+                                    <th className="px-6 py-3 w-[30%]">Book Details</th>
+                                    <th className="px-6 py-3 w-[15%]">Publisher</th>
+                                    <th className="px-6 py-3 w-[12%]">Base Price</th>
+                                    <th className="px-6 py-3 w-[12%]">Custom Price</th>
+                                    <th className="px-6 py-3 w-[10%]">Disc. %</th>
+                                    <th className="px-6 py-3 w-[10%]">Qty</th>
+                                    <th className="px-6 py-3 w-[10%] text-right">Total</th>
+                                    <th className="px-6 py-3 w-[5%] text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {books.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
+                                            No books selected. Click Add Books to start.
                                         </td>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    books.map((book) => {
+                                        const customPrice = customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : book.lowestPrice;
+                                        const quantity = quantities[book.bookId] || 1;
+                                        const discountPercent = bookDiscounts[book.bookId] || 0;
+                                        const discountedPrice = customPrice * (1 - discountPercent / 100);
+                                        const lineTotal = discountedPrice * quantity;
+
+                                        return (
+                                            <tr key={book.bookId} className="group hover:bg-muted/30 transition-colors">
+                                                <td className="px-6 py-4 align-top">
+                                                    <div className="font-medium text-foreground">{book.title}</div>
+                                                    <div className="text-xs text-muted-foreground mt-1 font-mono">{book.isbn}</div>
+                                                </td>
+                                                <td className="px-6 py-4 align-top text-muted-foreground">
+                                                    {book.publisher_name}
+                                                </td>
+                                                <td className="px-6 py-4 align-top text-muted-foreground">
+                                                    ${book.lowestPrice.toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 align-top">
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={customPrices[book.bookId] !== undefined ? customPrices[book.bookId] : ""}
+                                                        placeholder={book.lowestPrice.toFixed(2)}
+                                                        onChange={(e) => handleCustomPriceChange(book.bookId, e.target.value)}
+                                                        className="h-8 w-24 bg-background"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 align-top">
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={bookDiscounts[book.bookId] || ""}
+                                                        placeholder="0"
+                                                        onChange={(e) => handleBookDiscountChange(book.bookId, e.target.value)}
+                                                        className="h-8 w-16 bg-background"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 align-top">
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            onClick={() => handleQuantityDecrement(book.bookId)}
+                                                            disabled={quantity <= 1}
+                                                        >
+                                                            <Minus className="h-3 w-3" />
+                                                        </Button>
+                                                        <div className="w-10 text-center font-medium text-foreground">{quantity}</div>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            onClick={() => handleQuantityIncrement(book.bookId)}
+                                                        >
+                                                            <Plus className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 align-top text-right font-medium text-foreground">
+                                                    ${lineTotal.toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 align-top text-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleRemoveBook(book.bookId)}
+                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            {/* Totals Section */}
-            <div className="mt-6 flex justify-end">
-                <div className="w-full max-w-sm space-y-2">
-                    <div className="flex justify-between">
-                        <span className="text-[var(--text-secondary)]">Subtotal:</span>
-                        <span className="font-medium text-[var(--text-primary)]">${quotationSummary.subtotal.toFixed(2)}</span>
-                    </div>
-
-                    {quotationSummary.generalDiscountPercent > 0 && (
-                        <>
-                            <div className="flex justify-between text-[var(--error)]">
-                                <span className="text-[var(--text-secondary)]">General Discount ({quotationSummary.generalDiscountPercent}%)</span>
-                                <span className="font-medium">-${quotationSummary.discountAmount.toFixed(2)}</span>
+                {/* Footer Totals */}
+                <div className="flex justify-end pt-4">
+                    <div className="bg-card rounded-xl border border-border p-6 w-full max-w-md shadow-sm space-y-3">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Subtotal</span>
+                            <span className="text-foreground">${quotationSummary.subtotal.toFixed(2)}</span>
+                        </div>
+                        
+                        {quotationSummary.generalDiscountPercent > 0 && (
+                            <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                                <span>Discount ({quotationSummary.generalDiscountPercent}%)</span>
+                                <span>-${quotationSummary.discountAmount.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between font-semibold">
-                                <span className="text-[var(--text-primary)]">Subtotal (After Discount)</span>
-                                <span className="font-medium text-[var(--text-primary)]">${quotationSummary.subtotalAfterGeneralDiscount.toFixed(2)}</span>
-                            </div>
-                        </>
-                    )}
+                        )}
 
-                    <div className="flex justify-between border-t border-[var(--border)] pt-2 mt-2">
-                        <span className="text-[var(--text-secondary)]">Tax (5%):</span>
-                        <span className="font-medium text-[var(--text-primary)]">${quotationSummary.tax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xl font-bold border-t border-[var(--border)] pt-2 mt-2">
-                        <span className="text-[var(--text-primary)]">Total:</span>
-                        <span>${quotationSummary.total.toFixed(2)}</span>
+                        <div className="border-t border-border my-2"></div>
+
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Tax (5%)</span>
+                            <span className="text-foreground">${quotationSummary.tax.toFixed(2)}</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-end pt-2">
+                            <span className="text-base font-semibold text-foreground">Grand Total</span>
+                            <span className="text-2xl font-bold text-primary">${quotationSummary.total.toFixed(2)}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Save Button */}
-            <div className="mt-8 flex gap-3 justify-end">
-                <Button
-                    onClick={() => router.push(`/quotation/${quotationId}`)}
-                    variant="outline"
-                >
-                    Cancel
-                </Button>
-                <Button
-                    onClick={handleSave}
-                    disabled={isSaving || books.length === 0}
-                    className="bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white px-6 py-3 text-lg"
-                >
-                    {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
+                {/* Hidden Dialog */}
+                <BookSelectionDialog
+                    open={bookDialogOpen}
+                    onOpenChange={setBookDialogOpen}
+                    onBooksSelected={handleBooksSelected}
+                    initialSelectedBooks={books.map(b => b.bookId)}
+                    mode="edit"
+                    buttonText="Update Selection"
+                />
             </div>
-
-            {/* Book Selection Dialog */}
-            <BookSelectionDialog
-                open={bookDialogOpen}
-                onOpenChange={setBookDialogOpen}
-                onBooksSelected={handleBooksSelected}
-                initialSelectedBooks={currentBookIds}
-                mode="edit"
-                buttonText="Update Books"
-            />
         </div>
     );
 }
-

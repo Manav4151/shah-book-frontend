@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Shah Book House — Frontend
 
-## Getting Started
+This repository contains the frontend for the Shah Book House admin and storefront, built with Next.js (App Router) and TypeScript.
 
-First, run the development server:
+**Tech stack:** `Next.js`, `React`, `TypeScript`, `Tailwind CSS`, `ESLint`.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Quick overview:** the project uses the `app/` directory for routes, components live under `src/components`, hooks in `src/hooks`, and services in `src/services`.
+
+**Prerequisites**
+- **Node.js**: v18+ recommended
+- **Package manager**: `npm`, `pnpm`, or `yarn`
+
+**Install dependencies**
+
+```powershell
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Environment**
+Create a `.env` file at the project root (an example is already present). The app expects the following environment variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `NEXT_PUBLIC_SERVER_URL`: API server base URL (example: `http://localhost:5050`)
+- `NEXT_PUBLIC_FRONTEND_URL`: Frontend base URL (example: `http://localhost:5050`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+**Available scripts** (from `package.json`)
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev` : Runs the development server (Next.js with Turbopack)
+- `npm run build` : Builds the production bundle
+- `npm start` : Starts the production server after building
+- `npm run lint` : Runs ESLint
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run the dev server:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```powershell
+npm run dev
+```
 
-## Deploy on Vercel
+Open `http://localhost:3000` (or the port shown) in your browser.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Project structure (important folders)**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/` : Next.js App Router routes and pages
+- `src/components/` : Reusable UI components and feature components
+- `src/hooks/` : Custom React hooks used by the app
+- `src/lib/` : Utility modules and client wrappers
+- `src/services/` : API service layer
+- `public/` : Static assets
+
+**Features**
+
+- **Authentication**: Signup, login, forget-password and reset-password flows (pages under `app/(auth)`).
+- **Books management**: Browse, view details, insert new books, and edit existing books (`src/components/books`, `app/books`).
+- **Search & filters**: Client-side filtering, selection dialog, and templates for finding and importing books.
+- **Quotations**: Create, edit, preview, and manage quotations with status badges and statistics (`src/components/quotations`, `app/quotation`).
+- **Email integration**: Compose and send emails, view email list and details (`src/components/email`, `app/emails`).
+- **Import / export**: Excel import utilities, template saving/selection, and bulk operations.
+- **Admin & management**: Admin pages for overall management and role-aware features (`app/admin`, `app/management`).
+
+**Notes & tips**
+- The project uses Turbopack by default in dev/build scripts (see `package.json`). If you need to disable it, edit the scripts in `package.json`.
+- Follow the file layout inside `src/components` to find auth forms, book-related UI, and quotation components.
+
+---
+
+**Developer checklist**
+
+- **Install & setup:** `npm install` then create a `.env` (see examples above).
+- **Run locally:** `npm run dev` and confirm the app loads at `http://localhost:3000`.
+- **API connectivity:** Ensure `NEXT_PUBLIC_SERVER_URL` points to a running backend; verify key flows (login, list books, view a book).

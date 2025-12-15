@@ -1,87 +1,150 @@
 @import "tailwindcss";
 
-/* Light Theme Colors */
+/* ===== 🎨 Global Theme: Modern Primary Blue ===== */
+
 :root {
-  --primary: #3B82F6;
+  /* Primary System */
+  --primary: #3B82F6; /* Main Blue */
+  --primary-hover: #2563EB; /* Hover Contrast */
   --primary-dark: #1D4ED8;
-  --secondary: #6366F1;
-  --background: #F9FAFB;
-  --surface: #FFFFFF;
+  --primary-foreground: #ffffff;
+
+  /* Background & Foreground */
+  --background: #ffffff;
+  --foreground: #111827; /* Dark Slate Text */
+
+  /* Surface Layers */
+  --card: #ffffff;
+  --card-foreground: #111827;
+
+  --surface: #ffffff;
   --surface-hover: #F3F4F6;
+
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+
+  /* Secondary + Muted */
+  --secondary: #F1F5F9;
+  --secondary-foreground: #111827;
+
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
+
+  /* Borders + Input */
   --border: #E5E7EB;
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
+  --input: #ffffff;
+  --input-border: #E5E7EB;
+
+  /* Status Colors */
   --success: #22C55E;
   --warning: #F59E0B;
   --error: #EF4444;
-  
-  /* Legacy mappings for compatibility */
-  --foreground: var(--text-primary);
-  --muted: var(--surface-hover);
-  --muted-foreground: var(--text-secondary);
-  --input: var(--surface);
-  --input-border: var(--border);
-  --primary-foreground: #FFFFFF;
-  --destructive: var(--error);
-  --ring: var(--primary);
-}
+  --destructive: #EF4444;
 
-/* Dark Theme Colors */
-[data-theme="dark"] {
-  --primary: #60A5FA;
-  --primary-dark: #3B82F6;
-  --secondary: #818CF8;
-  --background: #0F172A;
-  --surface: #1E293B;
-  --surface-hover: #273449;
-  --border: #334155;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --success: #4ADE80;
-  --warning: #FBBF24;
-  --error: #F87171;
-  
-  /* Legacy mappings for compatibility */
-  --foreground: var(--text-primary);
-  --muted: var(--surface-hover);
-  --muted-foreground: var(--text-secondary);
-  --input: var(--surface);
-  --input-border: var(--border);
-  --primary-foreground: #FFFFFF;
-  --destructive: var(--error);
-  --ring: var(--primary);
-}
+  /* Accent */
+  --ring: #3B82F6;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-surface: var(--surface);
-  --color-surface-hover: var(--surface-hover);
-  --color-input-border: var(--input-border);
-  --color-primary: var(--primary);
-  --color-primary-dark: var(--primary-dark);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-destructive: var(--destructive);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-error: var(--error);
-  --color-ring: var(--ring);
+  /* Radius */
+  --radius: 0.5rem;
+
+  /* Typography */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* === DARK MODE === */
+[data-theme="dark"] {
+  /* Primary */
+  --primary: #60A5FA;
+  --primary-hover: #3B82F6;
+  --primary-dark: #1D4ED8;
+  --primary-foreground: #ffffff;
+
+  /* Background Layers */
+  --background: #0F172A;
+  --foreground: #F1F5F9;
+
+  --card: #1E293B;
+  --card-foreground: #F1F5F9;
+
+  --surface: #1E293B;
+  --surface-hover: #273449;
+
+  --popover: #1E293B;
+  --popover-foreground: #F1F5F9;
+
+  /* Secondary & Muted */
+  --secondary: #1E293B;
+  --secondary-foreground: #F1F5F9;
+
+  --muted: #273449;
+  --muted-foreground: #94A3B8;
+
+  /* Border / Inputs */
+  --border: #334155;
+  --input: #0F172A;
+  --input-border: #334155;
+
+  /* Status */
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --error: #F87171;
+  --destructive: #7F1D1D;
+
+  --ring: #60A5FA;
+}
+
+@theme inline {
+  /* Logical Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-dark: var(--primary-dark);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+
+  /* Status */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-destructive: var(--destructive);
+
+  /* Focus Ring */
+  --color-ring: var(--ring);
+
+  /* Radius */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Fonts */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+/* Base */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color .3s ease, color .3s ease;
 }
 
 @tailwind base;

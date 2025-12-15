@@ -1,3 +1,4 @@
+import { add } from 'lodash';
 import { ParamsOf } from './../../.next/types/routes.d';
 import axios from "axios";
 
@@ -348,4 +349,68 @@ export const apiFunctions = { // Renamed to avoid conflict with axios instance n
             return response.data;
         } catch (error) { throw handleError(error); }
     },
+
+    // customer suggestions
+    getCustomers: async () => {
+        try {
+            const response = await api.get('/api/customerlist');
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+
+    // agent crate api
+    createAgent: async (payload: any) => {
+        try {
+            const response = await api.post('/api/agent', payload);
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+
+    getAgent: async (page: any, limit: any) => {
+        const response = await api.get(`/api/agent/get-agents?page=${page}&limit=${limit}`);
+        return response.data;
+    },
+
+    getAllUsers: async () => {
+        try {
+            const response = await api.get('/api/user/get-users');
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+    addAgentAdmin: async (payload: any) => {
+        try {
+            const response = await api.post('/api/agent/add-admin', payload);
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+    addAgentUser: async (payload: any) => {
+        try {
+            const response = await api.post('/api/agent/add-user', payload);
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+    getAgentById: async (id : string) => {
+        try {
+            const response = await api.get(`/api/agent/${id}`);
+            return response.data;
+        } catch (error) { throw handleError(error); }
+    },
+    removeAgentAdmin: async (payload: any) => {
+        try {
+            const response = await api.post('/api/agent/remove-admin',payload);
+            return response.data;
+        } catch (error) {
+          throw handleError(error);  
+        }
+    },
+       removeAgentUser: async (payload: any) => {
+        try {
+            const response = await api.post('/api/agent/remove-user',payload);
+            return response.data;
+        } catch (error) {
+          throw handleError(error);  
+        }
+    },
+
+    
 };

@@ -17,7 +17,10 @@ export const authClient = createAuthClient({
 export type Session = typeof authClient.$Infer.Session;
 
 // ---- Role helpers ----
-export type Role = "admin" | "inventory_manager" | "sales_executive";
+export type Role =    "system_admin"
+  | "agent_admin"
+  | "inventory_manager"
+  | "sales_executive";;
 
 export function hasRole(session: Session | null, required: Role | Role[]): boolean {
   if (!session || !session.user) return false;
@@ -32,7 +35,7 @@ export function hasAnyRole(session: Session | null, roles: Role[]): boolean {
 }
 
 export function isAdmin(session: Session | null): boolean {
-  return hasRole(session, "admin");
+  return hasRole(session, "system_admin");
 }
 
 // Password reset helpers for our API
